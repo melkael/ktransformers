@@ -13,17 +13,26 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     git \
     curl \
+    build-essential \
+    cmake \
+    ninja-build \
     && rm -rf /var/lib/apt/lists/*
+
+
+
+RUN pip3 install torch torchvision torchaudio
+RUN pip3 install packaging ninja cpufeature numpy
 
 # Set the working directory
 WORKDIR /app
 
-# Copy requirements.txt from the docker directory
-#COPY requirements.txt /app/requirements.txt
 
-COPY . /app/llm_clean/
-RUN pip3 install -r /app/llm_clean/requirements.txt
-RUN bash install.sh
+COPY . /app/ktransformers/
+RUN cd ktransformers
+RUN git submodule init
+RUN git submodule update
+
+# RUN python3 /app/llm_clean/install_model.py
 
 # Add a label for the app name
 LABEL app.name=$APP_NAME
