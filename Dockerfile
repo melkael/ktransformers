@@ -1,35 +1,35 @@
-FROM node:20.16.0 as web_compile
-WORKDIR /home
-RUN <<EOF
-git clone https://github.com/kvcache-ai/ktransformers.git &&
-cd ktransformers/ktransformers/website/ &&
-npm install @vue/cli &&
-npm run build &&
-rm -rf node_modules
-EOF
+# Start with the NVIDIA CUDA 12.2 base image on Ubuntu 22.04
+FROM nvidia/cuda:12.2.0-base-ubuntu22.04
 
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV APP_NAME=AllO-RAN
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+ENV HF_HOME=/data/hf_cache/
 
-
-FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-devel as compile_server
-WORKDIR /workspace
-ENV CUDA_HOME /usr/local/cuda
-COPY --from=web_compile /home/ktransformers /workspace/ktransformers
-RUN <<EOF
-apt update -y &&  apt install -y  --no-install-recommends \
+# Update and install necessary packages
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
     git \
-    wget \
-    vim \
-    gcc \
-    g++ \
-    cmake && 
-rm -rf /var/lib/apt/lists/* &&
-cd ktransformers &&
-git submodule init &&
-git submodule update &&
-pip install ninja pyproject numpy cpufeature &&
-pip install flash-attn &&
-CPU_INSTRUCT=NATIVE  KTRANSFORMERS_FORCE_BUILD=TRUE TORCH_CUDA_ARCH_LIST="8.0;8.6;8.7;8.9;9.0+PTX" pip install . --no-build-isolation --verbose &&
-pip cache purge
-EOF
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["tail", "-f", "/dev/null"]
+# Set the working directory
+WORKDIR /app
+
+# Copy requirements.txt from the docker directory
+#COPY requirements.txt /app/requirements.txt
+
+COPY . /app/llm_clean/
+RUN pip3 install -r /app/llm_clean/requirements.txt
+RUN bash install.sh
+
+# Add a label for the app name
+LABEL app.name=$APP_NAME
+
+ARG DATE=unknown
+
+RUN chown -R 1001390000.1001390000 /app
+# Keep the container running
+CMD ["tail", "-f", "/dev/null"]
